@@ -2,6 +2,7 @@
 -- Grammaires de MC  et MCS                       --
 -----------------------------------------------------
 --options
+--commentaire sympa 
 option auto = true;
 option version = 0.0.1;
 option k=2;
