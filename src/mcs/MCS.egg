@@ -2,7 +2,6 @@
 -- Grammaires de MC  et MCS                       --
 -----------------------------------------------------
 --options
---commentaire sympa 
 option auto = true;
 option version = 0.0.1;
 option k=2;
@@ -23,6 +22,21 @@ inh machine : IMachine for
 syn code_asm : STRING for ASM;
 -- la TDS courante
 inh tds_asm : TDS for ASM;
+inh tds : TDS for ENTITES, DECL, ENTITE, STYPE;
+syn type : DTYPE for TYPE, PARF, CHAMP, STYPE;
+inh htype : DTYPE for DECL;
+inh champs : LCHAMPS for CHAMPS, CHAMP ; --liste des champs
+syn champ : CHAMP for CHAMP; 
+inh hadr : INTEGER for BLOC, INSTS, INST , CHAMPS, CHAMP; 
+--syn est_variable : BOOLEAN for DECL,ENTITE;
+--syn est_fonction : BOOLEAN for DECL,ENTITE;
+--inh hest_variable : BOOLEAN for ENTITE;
+--inh hest_fonction : BOOLEAN for ENTITE;
+--inh hlistparam : PARAMLIST for DECL, FONCTION, PARFS, PARFSX;
+--syn listparam : PARAMLIST for FONCTION;
+inh htxt : STRING for DECL;
+inh hinfofonction : INFOFONCTION for FONCTION, PARFS, PARFSX;
+
 
 --terminals
 space separateur is  "[\r\n\t ]+";     
@@ -93,7 +107,10 @@ global
 -- transmission de la machine cible  (choisie par l'option -m au lancement) 
 #init {
 local
+  tds : TDS;
 do
+   tds := new TDS();
+   ENTITES^tds := tds;
    machine := PROGRAMME^source.getMachine();
    if machine = null then
      error(NO_MACH, PROGRAMME^source.getMachName());
@@ -110,24 +127,132 @@ do
 end
 }
 ENTITES -> ;
-ENTITES -> ENTITE ENTITES ;
+ENTITES -> #gen ENTITE ENTITES;
+
+#gen {
+local
+do
+    --ENTITE^hest_variable := false;
+    --ENTITE^hest_fonction := false;
+    
+end
+}
+
 
 -- definition d'un nom de type (commence par une majuscule)
-ENTITE -> typedef TYPE identc pv ;
+ENTITE -> typedef TYPE identc #tdstype pv ;
+
+#tdstype {
+local
+  i : INFOTYPE;
+do
+  i := new INFOTYPE(new DTYPE(identc^txt,TYPE^type.getTaille()));
+  ENTITE^tds.inserer(identc^txt,i);
+end
+}
 -- definition d'une variable globale ou d'une fonction
 -- (commence par une minuscule)
-ENTITE ->  TYPE ident DECL ;
+
+ENTITE ->  TYPE ident #tdsglob DECL ;
+
+#tdsglob {
+local
+  --i : INFOVAR;
+  --j : INFOFONCTION;
+do
+  --ENTITE^est_variable := DECL^est_variable;
+  --ENTITE^est_fonction := DECL^est_fonction;
+  --if (DECL^est_variable) then
+    --i := new INFOVAR(new DTYPE(TYPE^type.getNom(),TYPE^type.getTaille()),0);
+    --ENTITE^tds.inserer(ident^txt,TYPE^type.getTaille());
+  --elseif (DECL^est_fonction) then
+    --j := new INFOFONCTION(new DTYPE(TYPE^type.getNom(),TYPE^type.getTaille())),DECL^listparam);
+  --end
+  DECL^htype := TYPE^type;
+  DECL^htxt := ident^txt;
+end
+}
 -- Variable
-DECL -> pv;
-DECL -> FONCTION ;
+DECL -> pv #typeinfo;
+
+#typeinfo {
+local 
+    i : INFOVAR;
+do
+  --DECL^est_variable := true;
+  --DECL^est_fonction := false;
+  
+  i := new INFOVAR(new DTYPE(DECL^htype.getNom(),DECL^htype.getTaille()),0);
+  DECL^tds.inserer(DECL^htxt,i);
+  
+end
+}
+DECL -> FONCTION #typeinfo ;
+
+#typeinfo {
+local
+do
+  --DECL^est_fonction := true;
+  --DECL^est_variable := false;
+end
+}
 -- Fonction
-FONCTION ->  paro PARFS parf BLOC ;
+FONCTION ->  paro #genlistparam PARFS parf BLOC ;
+
+#genlistparam {
+local
+  i : INFOFONCTION;
+do
+
+  l := new PARAMLIST();
+  
+  PARFS^hlistparam := l;
+  --FONCTION^listparam := PARFS^hlistparam;
+
+end
+}
+
+
 -- parametres de fonctions
 PARFS ->  ;
-PARFS ->  PARF PARFSX ;
-PARFSX ->  ;
-PARFSX ->  virg PARF PARFSX ;
-PARF ->  TYPE ident ;
+PARFS ->  PARF #majliste PARFSX;
+
+#majliste {
+local
+do
+
+  PARFS^hlistparam.ajouter(PARF^type);
+  
+
+end
+}
+
+PARFSX -> ;
+
+
+
+PARFSX ->  virg PARF #majliste PARFSX ;
+
+#majliste {
+local
+do
+
+  PARFSX^hlistparam.ajouter(PARF^type);
+
+end
+}
+
+PARF ->  TYPE ident #typeparam;
+
+#typeparam {
+local
+do
+
+  PARF^type := TYPE^type;
+  
+end
+}
+
 -- les types (de base, noms, struct et pointeurs)
 TYPE -> STYPE  PTRS ;
 -- type de base
@@ -139,14 +264,81 @@ STYPE-> void  ;
 STYPE-> int ;
 STYPE-> char ;
 -- nom de type (commence par une majuscule)
-STYPE -> identc;
+STYPE -> identc #type;
+#type {
+local
+  i : INFO ;
+  it : INFOTYPE ;
+  t : DTYPE ;
+do
+  i := STYPE^tds.chercherGlobalement(identc^txt) ;
+  if i = nil then
+    error(B_01, identc^txt) ;
+  else
+    match i
+    with INFOTYPE then
+      it := i;
+      STYPE^type := it.getType();
+    else
+      error(B_07,identc^txt);
+    end
+  end
+end
+}
+  
 -------------  
 -- et struct
-STYPE -> struct aco CHAMPS acf ;
+STYPE -> struct aco #ch CHAMPS acf #type ;
+global
+lc : LCHAMPS ;
+
+#ch {
+do
+  lc := new LCHAMPS() ;
+  CHAMPS^champs := lc ;
+  CHAMPS^hadr := 0 ;
+end
+}
+
+#type {
+do
+  STYPE^type := new STRUCT(lc) ; 
+end
+} 
 CHAMPS -> ;
 -- un nom de champ commence par une minuscule
-CHAMPS -> CHAMP CHAMPS ;
-CHAMP -> TYPE ident pv;
+CHAMPS -> #chh CHAMP #ch CHAMPS ;
+#chh {
+do
+  CHAMP^hadr := CHAMPS^hadr ;
+  CHAMP^champs := CHAMPS^champs; 
+end
+} 
+
+#ch {
+do
+  call CHAMPS^champs.inserer(CHAMP^champ) ; 
+  CHAMPS1^hadr := CHAMPS^hadr + CHAMP^type.getTaille();
+end
+}
+
+  
+CHAMP -> TYPE ident pv #ch; 
+#ch {
+local
+c : CHAMP ;
+do
+  c := CHAMP^champs.chercher(ident^txt) ;
+  if c /= nil then
+    error(B_00, ident^txt) ;
+  else 
+    c := new CHAMP(ident^txt, TYPE^type, CHAMP^hadr) ;
+    CHAMP^champ := c; 
+    CHAMP^type := TYPE^type ;  
+  end
+     
+end
+}
 -- corps de fonction et bloc d'instructions
 BLOC ->  aco INSTS acf ;
 -- instructions

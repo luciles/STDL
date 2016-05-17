@@ -9,7 +9,7 @@ import mcs.type.DTYPE;
  * @author marcel
  * 
  */
-public class INFOVAR implements INFO {
+public class INFOVAR extends INFO {
 	/**
 	 * Le type de la variable
 	 */
