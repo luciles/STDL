@@ -22,9 +22,10 @@ inh machine : IMachine for
 syn code_asm : STRING for ASM;
 -- la TDS courante
 inh tds_asm : TDS for ASM;
-inh tds : TDS for ENTITES, DECL, ENTITE, STYPE;
-syn type : DTYPE for TYPE, PARF, CHAMP, STYPE;
-inh htype : DTYPE for DECL;
+
+inh tds : TDS for ENTITES, DECL, ENTITE, INST, INSTS, STYPE, BLOC, SIX, E, F, TX, T, R, RX, A, AX, AFFX;
+syn type : DTYPE for TYPE, PARF, CHAMP, STYPE, E,AX,AFFX,R,RX,T,POADD,TX,OPMUL,F,OPUN,OPADD, FX, A; 
+inh htype : DTYPE for DECL, PTRS;
 inh champs : LCHAMPS for CHAMPS, CHAMP ; --liste des champs
 syn champ : CHAMP for CHAMP; 
 inh hadr : INTEGER for BLOC, INSTS, INST , CHAMPS, CHAMP; 
@@ -34,8 +35,9 @@ inh hadr : INTEGER for BLOC, INSTS, INST , CHAMPS, CHAMP;
 --inh hest_fonction : BOOLEAN for ENTITE;
 --inh hlistparam : PARAMLIST for DECL, FONCTION, PARFS, PARFSX;
 --syn listparam : PARAMLIST for FONCTION;
+inh hinfofonction : INFOFONCTION for FONCTION, PARFS, PARFSX ; 
 inh htxt : STRING for DECL;
-inh hinfofonction : INFOFONCTION for FONCTION, PARFS, PARFSX;
+syn adr : INTEGER for INSTS, INST;
 
 
 --terminals
@@ -157,17 +159,7 @@ ENTITE ->  TYPE ident #tdsglob DECL ;
 
 #tdsglob {
 local
-  --i : INFOVAR;
-  --j : INFOFONCTION;
 do
-  --ENTITE^est_variable := DECL^est_variable;
-  --ENTITE^est_fonction := DECL^est_fonction;
-  --if (DECL^est_variable) then
-    --i := new INFOVAR(new DTYPE(TYPE^type.getNom(),TYPE^type.getTaille()),0);
-    --ENTITE^tds.inserer(ident^txt,TYPE^type.getTaille());
-  --elseif (DECL^est_fonction) then
-    --j := new INFOFONCTION(new DTYPE(TYPE^type.getNom(),TYPE^type.getTaille())),DECL^listparam);
-  --end
   DECL^htype := TYPE^type;
   DECL^htxt := ident^txt;
 end
@@ -179,38 +171,27 @@ DECL -> pv #typeinfo;
 local 
     i : INFOVAR;
 do
-  --DECL^est_variable := true;
-  --DECL^est_fonction := false;
   
   i := new INFOVAR(new DTYPE(DECL^htype.getNom(),DECL^htype.getTaille()),0);
   DECL^tds.inserer(DECL^htxt,i);
   
 end
 }
-DECL -> FONCTION #typeinfo ;
+DECL -> #typeinfo FONCTION  ;
 
 #typeinfo {
 local
+    i : INFONCTION;
 do
-  --DECL^est_fonction := true;
-  --DECL^est_variable := false;
+  
+    i := new INFOVAR(new DTYPE(DECL^htype.getNom(),DECL^htype.getTaille()),0);
+    DECL^tds.inserer(DECL^htxt,i);
+    FONCTION^hinfofonction:=i;
+    
 end
 }
 -- Fonction
-FONCTION ->  paro #genlistparam PARFS parf BLOC ;
-
-#genlistparam {
-local
-  i : INFOFONCTION;
-do
-
-  l := new PARAMLIST();
-  
-  PARFS^hlistparam := l;
-  --FONCTION^listparam := PARFS^hlistparam;
-
-end
-}
+FONCTION ->  paro PARFS parf BLOC ;
 
 
 -- parametres de fonctions
@@ -221,8 +202,7 @@ PARFS ->  PARF #majliste PARFSX;
 local
 do
 
-  PARFS^hlistparam.ajouter(PARF^type);
-  
+  PARFS^hinfofonction.ajouter(PARF^type); 
 
 end
 }
@@ -237,7 +217,7 @@ PARFSX ->  virg PARF #majliste PARFSX ;
 local
 do
 
-  PARFSX^hlistparam.ajouter(PARF^type);
+  PARFSX^hinfofonction.ajouter(PARF^type);
 
 end
 }
@@ -254,15 +234,65 @@ end
 }
 
 -- les types (de base, noms, struct et pointeurs)
-TYPE -> STYPE  PTRS ;
+TYPE -> STYPE #ptype  PTRS #type;
+
+#type {
+local
+do
+
+  TYPE^type :=  STYPE^type;
+
+end
+}
+
+#ptype {
+local
+do
+
+    PTRS^htype:=STYPE^type;
+
+end
+}
+
+
 -- type de base
 -- des * pour definir un pointeur
 PTRS -> ;
 PTRS -> mult PTRS ;
 -- types de base
-STYPE-> void  ;
-STYPE-> int ;
-STYPE-> char ;
+STYPE-> void #type ;
+
+#type {
+local
+do
+
+  STYPE^type := new DTYPE("void",0);
+  
+end
+}
+
+STYPE-> int #type ;
+
+#type {
+local
+do
+
+  STYPE^type := new DTYPE("entier",4);
+  
+end
+}
+
+STYPE-> char #type ;
+
+#type {
+local
+do
+
+  STYPE^type := new DTYPE("caractere",1);
+  
+end
+}
+
 -- nom de type (commence par une majuscule)
 STYPE -> identc #type;
 #type {
@@ -342,20 +372,105 @@ end
 -- corps de fonction et bloc d'instructions
 BLOC ->  aco INSTS acf ;
 -- instructions
-INSTS ->   ;
-INSTS ->  INST INSTS  ;
+INSTS ->  #gen ;
+
+#gen {
+local
+do
+
+  INSTS^adr := INSTS^hadr;
+
+end
+}
+
+INSTS ->  INST #calcadresse INSTS #gen ;
+
+#calcadresse {
+local
+do
+
+  INSTS1^hadr := INST^adr;
+
+end
+}
+
+#gen {
+local
+do
+
+  INSTS^adr := INSTS1^adr;
+
+end
+}
+
 -- declaration de variable locale avec ou sans init 
-INST ->  TYPE ident AFFX pv ;
+INST ->  TYPE ident AFFX pv #gen;
+
+#gen {
+local
+  i : INFO;
+do
+
+  i := INST^tds.chercherLocalement(ident^txt);
+  if i /= null then
+    error(VAR_EXISTANTE,ident^txt);
+  else
+     i := new INFOVAR(TYPE^type,INST^hadr);
+     INST^tds.inserer(ident^txt,i);
+     INST^adr := INST^hadr + TYPE^type.getTaille();
+  end
+
+end
+}
 -- instruction expression (affectation et appel de procedure)
-INST -> E pv ;
+INST -> E pv #calcadr;
+
+#calcadr {
+local
+do
+
+  INST^adr := INST^hadr;
+  
+end
+}
+
 -- bloc d'instructions
 INST ->  BLOC  ;
 -- conditionnelle
-INST ->   si paro E parf BLOC SIX ;
+INST ->   si paro E #type parf BLOC SIX #gen;
+
+#gen {
+local
+do
+
+  INST^adr := INST^hadr;
+  
+end
+}
+
+#type {
+local
+do
+
+  if ~E^type.compareTo(new DTYPE("booleen",1)) then
+    error(MAUVAIS_TYPAGE_COND,E^type);
+  end
+
+end
+}
 SIX ->    sinon BLOC ;
 SIX -> ;
 -- retour de fonction
-INST ->  retour  E pv ;
+INST ->  retour  E pv #calcadresse ;
+
+#calcadresse {
+local
+do
+
+  INST^adr := INST^hadr;
+
+end
+}
 
 
 -- les expressions -------------
@@ -366,14 +481,79 @@ INST ->  retour  E pv ;
 -- T = expression figurant dans une expression additive (TERME)
 -- F = expression figurant dans une expression multiplicative (FACTEUR)
 -----------------------------------------------------------------------
-E ->   A  AFFX ;
+E ->   A  AFFX #type;
+
+#type {
+local
+do
+
+  if AFFX^type.getNom() = "void" then
+    E^type := A^type;
+  else 
+    E^type := new DTYPE("booleen",'1');
+  end
+
+end
+}
 -- affectation
-AFFX -> affect  A  ;
-AFFX -> ;
+AFFX -> affect  A #type ;
+
+#type {
+local
+do
+
+  AFFX^type := A^type;
+
+end
+}
+
+AFFX -> #type ;
+
+#type {
+local
+do
+
+  AFFX^type := new DTYPE("void",0);
+  
+end
+}
+
 -- relation
-A ->   R AX  ;
-AX -> OPREL R;
-AX ->  ;
+A ->   R AX #type ;
+
+#type {
+local
+do
+
+  if AX^type.getNom()="void" then
+    A^type := R^type;
+  else
+    A^type := AX^type;
+  end
+  
+end
+}
+
+AX -> OPREL R #type;
+
+#type {
+local
+do
+
+  AX^type := new DTYPE("booleen",1);
+
+end
+}
+AX -> #type ;
+
+#type {
+local
+do
+
+  AX^type := new DTYPE("void",0);
+
+end
+}
 -- operateurs relationnels
 OPREL -> inf ;
 OPREL -> sup ;
@@ -381,44 +561,338 @@ OPREL -> infeg ;
 OPREL -> supeg ;
 OPREL -> eg ;
 OPREL -> neg ;
-R ->  T  RX ;
+R ->  T  RX #type ;
+
+#type {
+local
+do
+
+  if RX^type.getNom()="void" then
+    R^type := T^type;
+  else if T^type /= RX^type then
+         error(ERREUR_TYPAGE_OPERATION,T^type,RX^type);
+       else
+         R^type := T^type;
+       end
+  end
+
+end
+}
 -- additions ...
-RX ->   OPADD  T RX  ;
-RX -> ;
+RX ->   OPADD  T RX #type ;
+
+#type {
+local
+do
+
+  if OPADD^type.getNom()="booleen" then
+    RX^type := OPADD^type;
+  else if T^type /= RX1^type then
+          error(ERREUR_TYPAGE_OPERATION,T^type,RX1^type);
+       else
+          RX^type := T^type;
+       end
+  end
+          
+
+end
+}
+RX -> #type;
+
+#type {
+local
+do
+
+  RX^type := new DTYPE("void",0);
+
+end
+}
 -- operateurs additifs
-OPADD -> plus ;
-OPADD -> moins ;
-OPADD -> ou ;
+OPADD -> plus #type;
+
+#type {
+local
+do
+
+  OPADD^type := null;
+
+end
+}
+OPADD -> moins #type ;
+
+#type {
+local
+do
+
+  OPADD^type := null;
+
+end
+}
+OPADD -> ou #type;
+
+#type {
+local
+do
+
+  OPADD^type := new DTYPE("booleen",1);
+
+end
+}
 -- multiplication, ...
-T ->  F  TX  ;
-TX ->   OPMUL  F TX  ;
-TX ->  ;
+T ->  F  TX #type ;
+
+#type {
+local
+do
+
+  if TX^type.getNom()="void" then 
+    T^type := F^type;
+  else if F^type/=TX^type then
+         error(ERREUR_TYPAGE_OPERATION,F^type,TX^type);
+       else
+         T^type := F^type;
+       end
+  end
+
+end
+}
+TX ->   OPMUL  F TX  #type;
+
+#type {
+local
+do
+
+  if OPMUL^type.getNom()="booleen" then
+    TX^type := OPMUL^type;
+  else if F^type/=TX1^type then
+         error(ERREUR_TYPAGE_OPERATION,F^type,TX1^type);
+       else 
+         TX^type := F^type;
+       end
+  end
+
+end
+}
+
+TX -> #type ;
+
+#type {
+local
+do
+
+  TX^type := new DTYPE("void",0);
+
+end
+}
 -- operateurs multiplicatifs
-OPMUL -> mult ;
-OPMUL -> div ;
-OPMUL -> mod ;
-OPMUL -> et ;
+OPMUL -> mult #type;
+
+#type {
+local
+do
+
+  OPMUL^type := null;
+  
+end
+}
+OPMUL -> div #type;
+
+#type {
+local
+do
+
+  OPMUL^type := null;
+  
+end
+}
+OPMUL -> mod #type; 
+
+#type {
+local
+do
+
+  OPMUL^type := null;
+  
+end
+}
+OPMUL -> et #type;
+
+#type {
+local
+do
+
+  OPMUL^type := new DTYPE("booleen",1);
+  
+end
+}
 -- expressions de base
 -- Constante entiere
-F -> entier   ;
+F -> entier #type  ;
+
+#type {
+local
+do
+
+  F^type := new DTYPE("entier",1);
+
+end
+}
 -- Constante chaine
-F -> chaine ;
+F -> chaine #type;
+
+#type {
+local
+do
+
+  F^type := new DTYPE("chaine",0);
+
+end
+}
 -- Constante caractere
-F -> caractere ;
+F -> caractere #type;
+
+#type {
+local
+do
+
+  F^type := new DTYPE("caractere",1);
+  
+end
+}
 -- expression unaire
-F ->  OPUN  F  ;
+F ->  OPUN  F #type ;
+
+#type {
+local
+do
+
+  if OPUN^type.getNom() = "booleen" then if F1^type.getNom()/="booleen" then
+                                            error(NON_BOOLEEN,F1^type);
+                                         else
+                                            F^type := OPUN^type;
+                                         end
+                                    else 
+                                         F^type := F1^type;
+                                    end
+                                    
+
+end
+}
 -- operateurs unaires
-OPUN -> plus ;
-OPUN -> moins ;
-OPUN -> non;
+OPUN -> plus #type ;
+
+#type {
+local
+do
+
+  OPUN^type := null;
+
+end
+}
+OPUN -> moins #type ;
+
+#type {
+local
+do
+
+  OPUN^type := null;
+
+end
+}
+
+OPUN -> non #type;
+
+#type {
+local
+do
+
+  OPUN^type := new DTYPE("booleen",1);
+
+end
+}
+
 -- pointeur NULL
-F -> null  ;
+F -> null #type ;
+
+#type {
+local
+do
+
+  F^type := null;
+  
+end
+}
 -- expression parenthesee
-F ->  paro E parf FX ;
-F ->  paro TYPE parf  F ;
-F -> mult F ;
-F -> ident FX ;
-FX -> ;
+F ->  paro E parf FX #type;
+
+#type {
+local
+do
+
+  if FX^type.getNom()="void" then
+    F^type := E^type;
+  else
+    --a faire
+    F^type := null;
+  end
+
+end
+}
+F ->  paro TYPE parf  F #type;
+
+#type {
+local
+do
+
+  if TYPE^type/=F1^type then
+    error(ERREUR_TYPAGE,TYPE^type,F1^type);
+  else
+    F^type := TYPE^type;
+  end
+
+end
+}
+F -> mult F #type ;
+
+#type {
+local
+do
+
+  F^type := F1^type;
+  
+end
+}
+
+F -> ident #tds FX #type ;
+
+#tds {
+local
+do
+
+  call F^tds.inserer(ident^txt,new INFOVAR(new DTYPE("entier",1),0));
+
+end
+}
+
+#type {
+local
+do
+
+  F^type := FX^type;
+
+end
+}
+
+FX -> #type;
+
+#type {
+local
+do
+
+  FX^type := new DTYPE("void",0);
+
+end
+}
 -- acces champ
 FX ->   pt  ident FX ;
 -- acces champ pointeur

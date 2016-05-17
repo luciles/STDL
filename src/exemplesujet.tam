@@ -1,0 +1,69 @@
+; TAM file
+  PUSH 1 ;Entier x
+  PUSH 2 ;Point p
+  LOADL 4 ;param int n
+  LOADL 5 ;param int m
+  CALL(SB) _foo ;appel de la fonction foo
+  HALT
+
+_foo :
+  PUSH 1 ;int xxx en 3[LB]
+  LOADL 100 ;stocker valeur
+  STORE (1) 3[LB] ;int xxx = 100
+  LOAD (1) -2[LB] ;charger param n
+  LOAD (1) -1[LB] ;charger param m
+  SUBR Iadd ;int a = n + m en 4[LB]
+  LOADL 1 ;taille du pointeur 
+  SUBR Malloc ;allocation memoire m* en 5[LB]
+  LOADL 1 
+  LOAD (1) 5[LB]
+  STOREI (1) ; m* = 1
+  LOAD (1) 5[LB] ;charger adresse pointeur m
+  LOADI (1) ;recuperer valeur de m*
+  LOADL 666 
+  SUBR Iadd ; m* + 666
+  STORE (1) 4[LB] ; a = m* + 666
+  POP (0) 1
+  RETURN (1) 0
+  
+  LOADL 2 ; 3[LB]
+  LOADL 3 ; 4[LB]
+  CALL(SB) _bar
+  
+_bar : 
+  LOADL 2 ; taille de struct
+  SUBR Malloc ; allocation mémoire pour *pt
+  LOAD (1) 5[SB] ; chargement de l'adresse de pt
+  LOADL 0 ; déplacement 0 pour x
+  SUBR Iadd ; calcul de l'adresse
+  LOADL 3 ; chargement de la valeur
+  STOREI (1) ; *pt.x = 3
+  LOAD (1) 5[SB] ; adresse *pt
+  LOADL 1 ; déplacement pour pt->y
+  SUBR Iadd ; calcul adresse
+  LOADL 3 ; chargement valeur
+  STOREI (1) ; pt->y =3
+  LOADL 301 ; u
+  LOADL 401 ; v
+  PUSH 1 ; result
+  LOAD (1) 3[SB] ; param a
+  LOAD (1) 4[SB] ; param b
+  CALL(SB) _foo ; appel de foo avec a et b
+  STORE (1) 8[SB] ; resultat de foo rangé dans result
+  RETURN (1) 0
+  
+; assembleur inline
+
+  CALL (LB) _main
+  HALT
+  
+_main :
+  LOADL 3
+  ; CHAR C=A
+  LOADL 999
+  CALL(SB) _foo 
+  
+ 
+
+  
+  
