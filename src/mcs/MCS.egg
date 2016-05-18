@@ -38,7 +38,9 @@ inh hadr : INTEGER for BLOC, INSTS, INST , CHAMPS, CHAMP;
 inh hinfofonction : INFOFONCTION for FONCTION, PARFS, PARFSX ; 
 inh htxt : STRING for DECL;
 syn adr : INTEGER for INSTS, INST;
-
+syn code : STRING for BLOC,INSTS,INST,TERME,FACTEUR,FX,TERMES, SIX;
+inh hcode : STRING for FX; 
+inh tam : MTAM for BLOC,INSTS,INST,E,SIX; 
 
 --terminals
 space separateur is  "[\r\n\t ]+";     
@@ -379,6 +381,7 @@ local
 do
 
   INSTS^adr := INSTS^hadr;
+  INSTS^code := ""; 
 
 end
 }
@@ -399,6 +402,7 @@ local
 do
 
   INSTS^adr := INSTS1^adr;
+  INSTS^code := INST^code + INSTS1^code ; 
 
 end
 }
@@ -444,6 +448,7 @@ local
 do
 
   INST^adr := INST^hadr;
+  INST^code := INST^tam.genIf(E^code,BLOC^code) + SIX^code ; 
   
 end
 }
@@ -458,8 +463,18 @@ do
 
 end
 }
-SIX ->    sinon BLOC ;
-SIX -> ;
+SIX ->    sinon BLOC #gen;
+#gen {
+do
+  SIX^code := SIX^tam.genElse(BLOC^code) ; 
+end
+}
+SIX -> #gen ;
+#gen {
+do
+  SIX^code := "" ; 
+end
+}
 -- retour de fonction
 INST ->  retour  E pv #calcadresse ;
 

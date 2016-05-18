@@ -8,8 +8,12 @@ package mcs.gc;
  */
 public class MTAM extends AbstractMachine {
 	
-
+	private static int cpt=0 ; //compteur pour les étiquettes
 	
+	public String genFonction(String etiquette, int taillepars,int tailleretour, String code) {
+		return "_" + etiquette + ":\n" + code + "\tRETURN (" + taillepars + ") "
+				+ tailleretour + "\n";
+	}
 	
 	@Override
 	public String getSuffixe() {
@@ -56,7 +60,27 @@ public class MTAM extends AbstractMachine {
 		return "\t;Calcul deplacement struct " + dep + "\n" + "\tLOADL " + dep
 				+ "\n\tSUBR Iadd\n";
 	}
-
+	
+	public String genFin() {
+		return "\tHALT\n";
+	}
+	
+	public String genEtiq() {
+		return "X" + cpt++ ;
+	}
+	
+	
+	public String genIf(String code, String code2) {
+		String sinon = genEtiq();
+		String fin = genEtiq();
+		return "\t; if\n" + code + "\n" + "\tJUMPIF(0) " + sinon + "\n" + code2
+				+ "\n" + "\tJUMP " + fin + "\n" + sinon + "\n" + code2 + "\n"
+				+ fin + "\n" + "\t; fin if\n";
+	}
+	public String genElse(String code) {
+		String sinon = genEtiq() ; 
+		return sinon + "\n" + code ; 
+	}
 	
 	
 
