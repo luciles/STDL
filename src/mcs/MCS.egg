@@ -25,7 +25,7 @@ inh tds_asm : TDS for ASM;
 
 inh tds : TDS for ENTITES, DECL, ENTITE, INST, INSTS, STYPE, BLOC, SIX, E, F, TX, T, R, RX, A, AX, AFFX;
 syn type : DTYPE for TYPE, PARF, CHAMP, STYPE, E,AX,AFFX,R,RX,T,POADD,TX,OPMUL,F,OPUN,OPADD, FX, A; 
-inh htype : DTYPE for DECL, PTRS;
+inh htype : DTYPE for DECL, PTRS, AFFX ;
 inh champs : LCHAMPS for CHAMPS, CHAMP ; --liste des champs
 syn champ : CHAMP for CHAMP; 
 inh hadr : INTEGER for BLOC, INSTS, INST , CHAMPS, CHAMP; 
@@ -38,9 +38,9 @@ inh hadr : INTEGER for BLOC, INSTS, INST , CHAMPS, CHAMP;
 inh hinfofonction : INFOFONCTION for FONCTION, PARFS, PARFSX ; 
 inh htxt : STRING for DECL;
 syn adr : INTEGER for INSTS, INST;
-syn code : STRING for BLOC,INSTS,INST,TERME,FACTEUR,FX,TERMES, SIX;
+syn code : STRING for F,E,BLOC,INSTS,INST,TERME,FACTEUR,FX,TERMES, SIX;
 inh hcode : STRING for FX; 
-inh tam : MTAM for BLOC,INSTS,INST,E,SIX; 
+inh tam : MTAM for F, BLOC,INSTS,INST,E,SIX, DECL; 
 
 --terminals
 space separateur is  "[\r\n\t ]+";     
@@ -176,6 +176,8 @@ do
   
   i := new INFOVAR(new DTYPE(DECL^htype.getNom(),DECL^htype.getTaille()),0);
   DECL^tds.inserer(DECL^htxt,i);
+  -- libérer de l'espace mémoire pour la variable déclarée
+  DECL^tam.genPush(DECL^htype.getTaille()) ; 
   
 end
 }
@@ -372,7 +374,22 @@ do
 end
 }
 -- corps de fonction et bloc d'instructions
-BLOC ->  aco INSTS acf ;
+BLOC ->  aco #tds INSTS acf #gen ;
+--def une tds locale à ce bloc ?
+global
+  t : TDS ; 
+#tds {
+do
+  t := new TDS(BLOC^tds) ; --tds du bloc comme parente
+  INSTS^tds := t;
+end
+}
+
+#gen {
+do
+  BLOC^code := INSTS^code + BLOC^tam.genFree(INSTS^adr - BLOC^hadr); --dep plutot que adr normalement
+end
+}
 -- instructions
 INSTS ->  #gen ;
 
@@ -422,6 +439,9 @@ do
      i := new INFOVAR(TYPE^type,INST^hadr);
      INST^tds.inserer(ident^txt,i);
      INST^adr := INST^hadr + TYPE^type.getTaille();
+     
+     --si affx = null, on declare sans initialiser
+     AFFX^type := TYPE^type.getType() ; 
   end
 
 end
@@ -434,6 +454,7 @@ local
 do
 
   INST^adr := INST^hadr;
+  INST^code := E^code ; 
   
 end
 }
@@ -466,6 +487,7 @@ end
 SIX ->    sinon BLOC #gen;
 #gen {
 do
+  BLOC^hadr := SIX^hadr ; 
   SIX^code := SIX^tam.genElse(BLOC^code) ; 
 end
 }
@@ -527,7 +549,7 @@ AFFX -> #type ;
 #type {
 local
 do
-
+  -- pourquoi ca peut etre qu'une fonction ? 
   AFFX^type := new DTYPE("void",0);
   
 end
@@ -749,6 +771,7 @@ local
 do
 
   F^type := new DTYPE("entier",1);
+  F^code := F^tam.genCst(entier^txt) ; 
 
 end
 }
@@ -760,6 +783,7 @@ local
 do
 
   F^type := new DTYPE("chaine",0);
+  F^code := F^tam.genCst(chaine^txt) ; 
 
 end
 }
@@ -771,6 +795,7 @@ local
 do
 
   F^type := new DTYPE("caractere",1);
+  F^code := F^tam.genCst(caractere^txt) ; 
   
 end
 }
